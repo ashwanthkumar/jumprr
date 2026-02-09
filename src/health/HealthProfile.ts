@@ -1,5 +1,5 @@
 import { AgeGroup, FitnessLevel, type HealthSettings } from '../types';
-import { AGE_GROUP_DEFAULTS, FITNESS_MULTIPLIERS } from '../constants';
+import { AGE_GROUP_DEFAULTS, FITNESS_MULTIPLIERS, AUTO_LAND_MS } from '../constants';
 
 export class HealthProfile {
   private _settings: HealthSettings = {
@@ -31,6 +31,10 @@ export class HealthProfile {
     this.applyDefaults();
   }
 
+  loadSettings(settings: HealthSettings): void {
+    this._settings = { ...settings };
+  }
+
   setWeight(weight: number): void {
     this._settings.weight = weight;
   }
@@ -41,6 +45,13 @@ export class HealthProfile {
 
   setJumpTarget(target: number): void {
     this._settings.jumpTarget = target;
+  }
+
+  getAutoLandMs(): number {
+    // Fitness-adjusted auto-land: beginners get more time, advanced get less
+    const fitMult = FITNESS_MULTIPLIERS[this._settings.fitnessLevel];
+    // Beginners (0.6x): ~600ms, Intermediate (1.0x): 500ms, Advanced (1.5x): ~400ms
+    return Math.round(AUTO_LAND_MS / Math.sqrt(fitMult));
   }
 
   getSpeedFactor(): number {

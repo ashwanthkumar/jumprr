@@ -1,6 +1,5 @@
-import { AgeGroup, FitnessLevel } from '../../types';
+import { FitnessLevel } from '../../types';
 import type { HealthProfile } from '../../health/HealthProfile';
-import { AGE_GROUP_DEFAULTS, FITNESS_MULTIPLIERS } from '../../constants';
 
 export function createSetupScreen(
   profile: HealthProfile,

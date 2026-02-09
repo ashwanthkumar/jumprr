@@ -22,6 +22,8 @@ export class PlayerCharacter {
   constructor() {
     this.root = new THREE.Group();
     this.root.position.y = CHARACTER_BASE_Y;
+    // Face character away from camera (show back, not face)
+    this.root.rotation.y = Math.PI;
 
     const skinColor = 0xf4c89a;
     const shirtColor = 0x4a90d9;

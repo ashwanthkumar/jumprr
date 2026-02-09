@@ -15,7 +15,7 @@ export const CHARACTER_Z = 0;
 export const CHARACTER_BASE_Y = 0;
 export const LANE_SWITCH_SPEED = 8; // units per second
 export const JUMP_HEIGHT = 3.0;
-export const JUMP_DURATION = 0.6; // seconds
+export const JUMP_DURATION = 0.5; // seconds (matches AUTO_LAND_MS)
 
 // Obstacles
 export const BARRIER_HEIGHT = 1.2;
@@ -49,31 +49,44 @@ export const MAX_COMBO_MULTIPLIER = 5;
 
 // Pose Detection
 export const POSE_DETECTION_INTERVAL = 3; // run every N frames
-export const JUMP_LAUNCH_THRESHOLD = 0.30; // 30% of torso height
-export const LATERAL_THRESHOLD = 0.08; // 8% of shoulder width
-export const JUMP_COOLDOWN_MS = 400;
-export const CALIBRATION_DURATION = 3; // seconds
+export const JUMP_LAUNCH_THRESHOLD = 0.25; // 25% of nose-to-shoulder distance
+export const AUTO_LAND_MS = 500; // auto-land cooldown (average human hang time ~530ms)
+export const Z_LEAN_REJECTION_RATIO = 2.0; // if abs(zDisp)/abs(yDisp) > this, reject as lean
+export const CALIBRATION_DURATION = 5; // seconds
 export const EMA_ALPHA = 0.3; // smoothing factor
+// Require shoulders to rise by at least this fraction of threshold to confirm it's
+// a whole-body jump (not just a head nod)
+export const SHOULDER_CONFIRM_RATIO = 0.4;
 
 // MediaPipe Landmark indices
 export const LM = {
+  NOSE: 0,
+  LEFT_EYE_INNER: 1,
+  LEFT_EYE: 2,
+  LEFT_EYE_OUTER: 3,
+  RIGHT_EYE_INNER: 4,
+  RIGHT_EYE: 5,
+  RIGHT_EYE_OUTER: 6,
+  LEFT_EAR: 7,
+  RIGHT_EAR: 8,
+  MOUTH_LEFT: 9,
+  MOUTH_RIGHT: 10,
   LEFT_SHOULDER: 11,
   RIGHT_SHOULDER: 12,
-  LEFT_HIP: 23,
-  RIGHT_HIP: 24,
-  LEFT_HEEL: 29,
-  RIGHT_HEEL: 30,
-  LEFT_FOOT: 31,
-  RIGHT_FOOT: 32,
-  NOSE: 0,
   LEFT_ELBOW: 13,
   RIGHT_ELBOW: 14,
   LEFT_WRIST: 15,
   RIGHT_WRIST: 16,
+  LEFT_HIP: 23,
+  RIGHT_HIP: 24,
   LEFT_KNEE: 25,
   RIGHT_KNEE: 26,
   LEFT_ANKLE: 27,
   RIGHT_ANKLE: 28,
+  LEFT_HEEL: 29,
+  RIGHT_HEEL: 30,
+  LEFT_FOOT: 31,
+  RIGHT_FOOT: 32,
 };
 
 // Health

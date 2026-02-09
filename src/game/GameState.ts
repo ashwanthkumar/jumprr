@@ -12,7 +12,7 @@ export class GameState {
     maxCombo: 0,
     jumpCount: 0,
     currentLane: Lane.CENTER,
-    activeLanes: 3,
+    activeLanes: 1,
     sessionTimeRemaining: 0,
     sessionDuration: 0,
     isStumbling: false,

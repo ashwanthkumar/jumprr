@@ -1,4 +1,4 @@
-import { GameScreen, JumpDirection, Lane } from '../types';
+import { GameScreen } from '../types';
 import type { PoseData } from '../types';
 import { CHARACTER_Z, STUMBLE_DURATION, STUMBLE_SPEED_FACTOR } from '../constants';
 
@@ -19,18 +19,20 @@ import { Environment } from '../world/Environment';
 import { PoseTracker } from '../pose/PoseTracker';
 import { BaselineCalibrator } from '../pose/BaselineCalibrator';
 import { JumpDetector } from '../pose/JumpDetector';
+import { SkeletonOverlay } from '../pose/SkeletonOverlay';
 import { HealthProfile } from '../health/HealthProfile';
 import { CalorieEstimator } from '../health/CalorieEstimator';
 import { RecommendationEngine } from '../health/RecommendationEngine';
 import { UIManager } from '../ui/UIManager';
 import { createWelcomeScreen } from '../ui/screens/WelcomeScreen';
 import { createSetupScreen } from '../ui/screens/SetupScreen';
-import { createCalibrationScreen, updateCalibrationProgress } from '../ui/screens/CalibrationScreen';
+import { createCalibrationScreen, resetCalibrationScreen, startCalibrationCountdown, updateCalibrationProgress } from '../ui/screens/CalibrationScreen';
 import { createCountdownScreen, runCountdown } from '../ui/screens/CountdownScreen';
 import { createHUDScreen, updateHUD } from '../ui/screens/HUDScreen';
 import { createPauseScreen } from '../ui/screens/PauseScreen';
 import { createRestScreen, updateRestTimer } from '../ui/screens/RestScreen';
 import { createResultsScreen, updateResults } from '../ui/screens/ResultsScreen';
+import { createDiagnosticScreen, updateDiagnostic, setDiagnosticVideo } from '../ui/screens/DiagnosticScreen';
 
 export class GameEngine {
   private clock: Clock;
@@ -56,9 +58,13 @@ export class GameEngine {
   private uiManager: UIManager;
 
   private cameraPreview: HTMLDivElement | null = null;
+  private skeletonOverlay: SkeletonOverlay;
   private stumbleTimer = 0;
   private distance = 0;
   private rafId = 0;
+  private diagJumpCount = 0;
+  private lastRestWallTime = 0;
+  private resumingFromRest = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.clock = new Clock();
@@ -82,6 +88,7 @@ export class GameEngine {
     this.poseTracker = new PoseTracker();
     this.calibrator = new BaselineCalibrator();
     this.jumpDetector = new JumpDetector();
+    this.skeletonOverlay = new SkeletonOverlay();
     this.healthProfile = new HealthProfile();
     this.calorieEstimator = new CalorieEstimator();
     this.recommendationEngine = new RecommendationEngine();
@@ -104,7 +111,7 @@ export class GameEngine {
     this.uiManager.registerScreen(GameScreen.SETUP, setup);
 
     // Calibration
-    const calibration = createCalibrationScreen();
+    const calibration = createCalibrationScreen(() => this.onCalibrationReady());
     this.uiManager.registerScreen(GameScreen.CALIBRATION, calibration);
 
     // Countdown
@@ -135,6 +142,66 @@ export class GameEngine {
       () => this.showSetup(),
     );
     this.uiManager.registerScreen(GameScreen.RESULTS, results);
+
+    // Diagnostic
+    const diagnostic = createDiagnosticScreen(
+      () => this.diagCalibrate(),
+      () => this.diagClose(),
+    );
+    this.uiManager.registerScreen(GameScreen.DIAGNOSTIC, diagnostic);
+
+    // Add "Test Pose" button to setup screen
+    this.addDiagButtonToSetup(setup);
+  }
+
+  private addDiagButtonToSetup(setupScreen: HTMLElement): void {
+    const btnContainer = setupScreen.querySelector('.btn-primary')?.parentElement;
+    if (btnContainer) {
+      const diagBtn = document.createElement('button');
+      diagBtn.className = 'btn btn-secondary';
+      diagBtn.id = 'btn-test-pose';
+      diagBtn.textContent = 'Test Pose Detection';
+      diagBtn.style.marginTop = '8px';
+      diagBtn.style.display = 'block';
+      diagBtn.style.width = '100%';
+      diagBtn.addEventListener('click', () => this.startDiagnostic());
+      btnContainer.appendChild(diagBtn);
+    }
+  }
+
+  private async startDiagnostic(): Promise<void> {
+    try {
+      if (!this.poseTracker.isReady) {
+        await this.poseTracker.init();
+      }
+      if (!this.poseTracker.hasCamera) {
+        await this.poseTracker.startCamera();
+      }
+      // Feed video to diagnostic screen
+      const video = this.poseTracker.getVideoElement();
+      const diagScreen = this.uiManager.getScreen(GameScreen.DIAGNOSTIC)!;
+      if (video) {
+        setDiagnosticVideo(diagScreen, video.srcObject);
+      }
+      this.diagJumpCount = 0;
+      this.jumpDetector.reset();
+      this.uiManager.showScreen(GameScreen.DIAGNOSTIC);
+      this.gameState.setScreen(GameScreen.DIAGNOSTIC);
+    } catch (err) {
+      alert('Camera access is required. Please allow camera access and try again.');
+      console.error('Camera error:', err);
+    }
+  }
+
+  private diagCalibrate(): void {
+    this.calibrator.startCalibration();
+    this.jumpDetector.reset();
+    this.diagJumpCount = 0;
+    console.log('[DIAG] Starting calibration...');
+  }
+
+  private diagClose(): void {
+    this.showSetup();
   }
 
   private setupKeyboardHandlers(): void {
@@ -145,6 +212,16 @@ export class GameEngine {
           this.pauseGame();
         } else if (screen === GameScreen.PAUSED) {
           this.resumeGame();
+        } else if (screen === GameScreen.DIAGNOSTIC) {
+          this.diagClose();
+        }
+      }
+      // 'D' key toggles diagnostic mode from playing/paused
+      if (e.key === 'd' || e.key === 'D') {
+        const screen = this.gameState.state.screen;
+        if (screen === GameScreen.PLAYING || screen === GameScreen.PAUSED) {
+          this.pauseGame();
+          this.startDiagnostic();
         }
       }
     });
@@ -175,8 +252,10 @@ export class GameEngine {
       if (!this.poseTracker.isReady) {
         await this.poseTracker.init();
       }
-      const video = await this.poseTracker.startCamera();
-      this.showCameraPreview(video);
+      if (!this.poseTracker.hasCamera) {
+        const video = await this.poseTracker.startCamera();
+        this.showCameraPreview(video);
+      }
       this.startCalibration();
     } catch (err) {
       alert('Camera access is required to play Jumprr. Please allow camera access and try again.');
@@ -195,12 +274,22 @@ export class GameEngine {
     previewVideo.muted = true;
     previewVideo.play();
     this.cameraPreview.appendChild(previewVideo);
+    this.cameraPreview.appendChild(this.skeletonOverlay.element);
     document.getElementById('ui-overlay')!.appendChild(this.cameraPreview);
   }
 
   private startCalibration(): void {
+    // Show calibration screen with instructions + "I'm Ready" button
+    const calScreen = this.uiManager.getScreen(GameScreen.CALIBRATION)!;
+    resetCalibrationScreen(calScreen);
     this.uiManager.showScreen(GameScreen.CALIBRATION);
     this.gameState.setScreen(GameScreen.CALIBRATION);
+    // Calibration sampling starts when user clicks "I'm Ready"
+  }
+
+  private onCalibrationReady(): void {
+    const calScreen = this.uiManager.getScreen(GameScreen.CALIBRATION)!;
+    startCalibrationCountdown(calScreen);
     this.calibrator.startCalibration();
   }
 
@@ -252,9 +341,9 @@ export class GameEngine {
   }
 
   private resumeFromRest(): void {
-    this.uiManager.showScreen(GameScreen.PLAYING);
-    this.gameState.setScreen(GameScreen.PLAYING);
-    this.clock.resume();
+    // Re-calibrate after rest break before resuming gameplay
+    this.resumingFromRest = true;
+    this.startCalibration();
   }
 
   private endSession(): void {
@@ -296,15 +385,82 @@ export class GameEngine {
     // Calibration: keep detecting pose to feed samples
     if (screen === GameScreen.CALIBRATION) {
       const pose = this.poseTracker.detect();
-      if (pose && this.calibrator.isCalibrating) {
-        const done = this.calibrator.addSample(pose);
-        const calScreen = this.uiManager.getScreen(GameScreen.CALIBRATION)!;
-        updateCalibrationProgress(calScreen, this.calibrator.progress);
-        if (done) {
-          this.gameState.emit('calibrationComplete');
-          this.startCountdown();
+      if (pose) {
+        this.skeletonOverlay.draw(pose);
+        if (this.calibrator.isCalibrating) {
+          const done = this.calibrator.addSample(pose);
+          const calScreen = this.uiManager.getScreen(GameScreen.CALIBRATION)!;
+          updateCalibrationProgress(calScreen, this.calibrator.progress);
+          if (done) {
+            this.skeletonOverlay.setCalibration(this.calibrator.calibrationData);
+            this.gameState.emit('calibrationComplete');
+
+            if (this.resumingFromRest) {
+              // Resuming after rest break — skip countdown, go straight to playing
+              this.resumingFromRest = false;
+              this.uiManager.showScreen(GameScreen.PLAYING);
+              this.gameState.setScreen(GameScreen.PLAYING);
+              this.clock.resume();
+            } else {
+              this.startCountdown();
+            }
+          }
         }
       }
+      return;
+    }
+
+    // Diagnostic mode: detect pose, run jump detection, update diagnostic UI
+    if (screen === GameScreen.DIAGNOSTIC) {
+      const pose = this.poseTracker.detect();
+      if (pose) {
+        this.skeletonOverlay.draw(pose);
+
+        // Run calibration if in progress
+        if (this.calibrator.isCalibrating) {
+          const done = this.calibrator.addSample(pose);
+          if (done) {
+            this.skeletonOverlay.setCalibration(this.calibrator.calibrationData);
+            console.log('[DIAG] Calibration complete!');
+          }
+        }
+
+        // Run jump detection if calibrated
+        if (this.calibrator.calibrationData.isCalibrated) {
+          const jumpEvent = this.jumpDetector.detect(pose, this.calibrator.calibrationData);
+          if (jumpEvent) {
+            this.diagJumpCount++;
+          }
+        }
+
+        // Update diagnostic UI
+        const diagScreen = this.uiManager.getScreen(GameScreen.DIAGNOSTIC)!;
+        updateDiagnostic(
+          diagScreen,
+          pose,
+          this.calibrator.calibrationData.isCalibrated ? this.calibrator.calibrationData : null,
+          this.jumpDetector.currentState,
+          this.diagJumpCount,
+          this.jumpDetector.cooldownRemaining,
+        );
+      }
+      return;
+    }
+
+    // Rest screen: countdown using wall-clock time (game clock is paused)
+    if (screen === GameScreen.REST) {
+      const now = performance.now();
+      if (this.lastRestWallTime > 0) {
+        const wallDt = (now - this.lastRestWallTime) / 1000;
+        const result = this.sessionManager.update(wallDt);
+        const restScreen = this.uiManager.getScreen(GameScreen.REST)!;
+        updateRestTimer(restScreen, this.sessionManager.restTimeRemaining);
+        if (result === 'playing') {
+          this.lastRestWallTime = 0;
+          this.resumeFromRest();
+        }
+      }
+      this.lastRestWallTime = now;
       return;
     }
 
@@ -314,19 +470,13 @@ export class GameEngine {
     const sessionResult = this.sessionManager.update(dt);
     if (sessionResult === 'rest') {
       this.clock.pause();
+      this.lastRestWallTime = performance.now();
       this.uiManager.showScreen(GameScreen.REST);
       this.gameState.setScreen(GameScreen.REST);
       return;
     }
     if (sessionResult === 'ended') {
       this.endSession();
-      return;
-    }
-
-    // Update rest screen if visible
-    if (this.gameState.state.screen === GameScreen.REST) {
-      const restScreen = this.uiManager.getScreen(GameScreen.REST)!;
-      updateRestTimer(restScreen, this.sessionManager.restTimeRemaining);
       return;
     }
 
@@ -343,7 +493,7 @@ export class GameEngine {
     // Score from distance
     this.scoreSystem.update(scrollAmount);
 
-    // Lane narrowing
+    // Lane narrowing (always returns 1 now)
     const activeLanes = this.laneNarrower.update(this.distance);
     this.gameState.setActiveLanes(activeLanes);
     this.laneController.setActiveLanes(activeLanes);
@@ -356,10 +506,13 @@ export class GameEngine {
 
     // Pose detection + jump detection
     const pose = this.poseTracker.detect();
-    if (pose && this.calibrator.calibrationData.isCalibrated) {
-      const jumpEvent = this.jumpDetector.detect(pose, this.calibrator.calibrationData);
-      if (jumpEvent) {
-        this.handleJump(jumpEvent.direction);
+    if (pose) {
+      this.skeletonOverlay.draw(pose);
+      if (this.calibrator.calibrationData.isCalibrated) {
+        const jumpEvent = this.jumpDetector.detect(pose, this.calibrator.calibrationData);
+        if (jumpEvent) {
+          this.handleJump();
+        }
       }
     }
 
@@ -392,18 +545,10 @@ export class GameEngine {
     updateHUD(hudScreen, this.gameState.state);
   };
 
-  private handleJump(direction: JumpDirection): void {
+  private handleJump(): void {
     this.jumpAnimator.startJump();
     this.scoreSystem.onJump();
-    this.sessionManager.recordJump(direction);
-
-    if (direction === JumpDirection.LEFT) {
-      this.laneController.switchLane('left');
-    } else if (direction === JumpDirection.RIGHT) {
-      this.laneController.switchLane('right');
-    }
-
-    this.gameState.setLane(this.laneController.currentLane);
+    this.sessionManager.recordJump();
   }
 
   private handleCollision(): void {

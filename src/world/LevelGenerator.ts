@@ -19,8 +19,6 @@ export class LevelGenerator {
   private furthestZ = 0;
   private lastObstacleZ = 0;
   private totalDistance = 0;
-  private activeLanes = 3;
-
   constructor(scene: THREE.Scene) {
     this.scene = scene;
     this.obstacleFactory = new ObstacleFactory(scene);
@@ -39,8 +37,8 @@ export class LevelGenerator {
     this.furthestZ = -(totalSegments - 1) * TRACK_SEGMENT_LENGTH;
   }
 
-  setActiveLanes(count: number): void {
-    this.activeLanes = count;
+  setActiveLanes(_count: number): void {
+    // Single lane only
   }
 
   update(scrollAmount: number, distance: number): void {
@@ -95,31 +93,8 @@ export class LevelGenerator {
   }
 
   private generatePattern(): Array<{ type: ObstacleType; lane: Lane }> {
-    const lanes = this.getAvailableLanes();
-    const pattern: Array<{ type: ObstacleType; lane: Lane }> = [];
-
-    if (lanes.length <= 1) {
-      // Only center lane available, spawn a barrier (must jump)
-      pattern.push({ type: ObstacleType.BARRIER, lane: Lane.CENTER });
-      return pattern;
-    }
-
-    // Ensure at least one lane is free
-    const blockedCount = Math.min(lanes.length - 1, Math.floor(Math.random() * lanes.length));
-    const shuffled = [...lanes].sort(() => Math.random() - 0.5);
-
-    for (let i = 0; i < blockedCount; i++) {
-      const type = Math.random() < 0.5 ? ObstacleType.BARRIER : ObstacleType.WALL;
-      pattern.push({ type, lane: shuffled[i] });
-    }
-
-    return pattern;
-  }
-
-  private getAvailableLanes(): Lane[] {
-    if (this.activeLanes === 3) return [Lane.LEFT, Lane.CENTER, Lane.RIGHT];
-    if (this.activeLanes === 2) return [Lane.LEFT, Lane.CENTER];
-    return [Lane.CENTER];
+    // Single lane: always spawn a barrier in center (must jump over it)
+    return [{ type: ObstacleType.BARRIER, lane: Lane.CENTER }];
   }
 
   private getObstacleDensity(): number {
@@ -145,6 +120,5 @@ export class LevelGenerator {
     this.furthestZ = -(this.segments.length - 1) * TRACK_SEGMENT_LENGTH;
     this.lastObstacleZ = 0;
     this.totalDistance = 0;
-    this.activeLanes = 3;
   }
 }

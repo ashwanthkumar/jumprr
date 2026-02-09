@@ -6,10 +6,13 @@ export class BaselineCalibrator {
   private startTime = 0;
   private _isCalibrating = false;
   private _calibrationData: CalibrationData = {
-    baselineFootY: 0,
-    torsoHeight: 0,
+    baselineNoseY: 0,
+    baselineShoulderY: 0,
+    baselineNoseZ: 0,
+    baselineShoulderZ: 0,
+    noseShoulderDistY: 0,
+    noseShoulderDist3D: 0,
     shoulderWidth: 0,
-    hipCenterX: 0,
     isCalibrated: false,
   };
 
@@ -50,47 +53,80 @@ export class BaselineCalibrator {
   private finalize(): void {
     if (this.samples.length === 0) return;
 
-    let totalFootY = 0;
-    let totalTorsoHeight = 0;
+    let totalNoseY = 0;
+    let totalShoulderY = 0;
+    let totalNoseZ = 0;
+    let totalShoulderZ = 0;
+    let totalNoseShoulderDistY = 0;
     let totalShoulderWidth = 0;
-    let totalHipX = 0;
     let count = 0;
 
     for (const sample of this.samples) {
       const lm = sample.landmarks;
       if (lm.length < 33) continue;
 
-      // Lowest foot Y (in webcam coordinates, higher Y = lower position)
-      const leftFootY = lm[LM.LEFT_FOOT].y;
-      const rightFootY = lm[LM.RIGHT_FOOT].y;
-      const footY = Math.max(leftFootY, rightFootY);
+      // Require nose and both shoulders to be visible
+      if (lm[LM.NOSE].visibility < 0.5) continue;
+      if (lm[LM.LEFT_SHOULDER].visibility < 0.5 || lm[LM.RIGHT_SHOULDER].visibility < 0.5) continue;
 
-      // Torso height (shoulder to hip)
+      const noseY = lm[LM.NOSE].y;
+      const noseZ = lm[LM.NOSE].z;
       const shoulderMidY = (lm[LM.LEFT_SHOULDER].y + lm[LM.RIGHT_SHOULDER].y) / 2;
-      const hipMidY = (lm[LM.LEFT_HIP].y + lm[LM.RIGHT_HIP].y) / 2;
-      const torsoHeight = Math.abs(hipMidY - shoulderMidY);
+      const shoulderMidZ = (lm[LM.LEFT_SHOULDER].z + lm[LM.RIGHT_SHOULDER].z) / 2;
+
+      // Nose-to-shoulder vertical distance (Y-only, for threshold calculation)
+      const noseShoulderDistY = Math.abs(shoulderMidY - noseY);
 
       // Shoulder width
       const shoulderWidth = Math.abs(lm[LM.LEFT_SHOULDER].x - lm[LM.RIGHT_SHOULDER].x);
 
-      // Hip center X
-      const hipCenterX = (lm[LM.LEFT_HIP].x + lm[LM.RIGHT_HIP].x) / 2;
-
-      totalFootY += footY;
-      totalTorsoHeight += torsoHeight;
+      totalNoseY += noseY;
+      totalShoulderY += shoulderMidY;
+      totalNoseZ += noseZ;
+      totalShoulderZ += shoulderMidZ;
+      totalNoseShoulderDistY += noseShoulderDistY;
       totalShoulderWidth += shoulderWidth;
-      totalHipX += hipCenterX;
       count++;
     }
 
     if (count > 0) {
+      const avgNoseY = totalNoseY / count;
+      const avgShoulderY = totalShoulderY / count;
+      const avgNoseZ = totalNoseZ / count;
+      const avgShoulderZ = totalShoulderZ / count;
+      const avgDistY = totalNoseShoulderDistY / count;
+
+      // 3D Euclidean distance for diagnostics
+      const dy = avgShoulderY - avgNoseY;
+      const dz = avgShoulderZ - avgNoseZ;
+      const dist3D = Math.sqrt(dy * dy + dz * dz);
+
       this._calibrationData = {
-        baselineFootY: totalFootY / count,
-        torsoHeight: totalTorsoHeight / count,
+        baselineNoseY: avgNoseY,
+        baselineShoulderY: avgShoulderY,
+        baselineNoseZ: avgNoseZ,
+        baselineShoulderZ: avgShoulderZ,
+        noseShoulderDistY: avgDistY,
+        noseShoulderDist3D: dist3D,
         shoulderWidth: totalShoulderWidth / count,
-        hipCenterX: totalHipX / count,
         isCalibrated: true,
       };
+
+      const cd = this._calibrationData;
+      const jumpThresh = cd.noseShoulderDistY * 0.25;
+      console.log(
+        `%c[CALIBRATION] Complete! ${count}/${this.samples.length} valid samples\n` +
+        `  baselineNoseY:     ${cd.baselineNoseY.toFixed(4)}\n` +
+        `  baselineShoulderY: ${cd.baselineShoulderY.toFixed(4)}\n` +
+        `  baselineNoseZ:     ${cd.baselineNoseZ.toFixed(4)}\n` +
+        `  baselineShoulderZ: ${cd.baselineShoulderZ.toFixed(4)}\n` +
+        `  noseShoulderDistY: ${cd.noseShoulderDistY.toFixed(4)} (Y-only reference)\n` +
+        `  noseShoulderDist3D:${cd.noseShoulderDist3D.toFixed(4)} (3D reference)\n` +
+        `  shoulderWidth:     ${cd.shoulderWidth.toFixed(4)}\n` +
+        `  jumpThreshold:     ${jumpThresh.toFixed(4)} (25% of Y dist)\n` +
+        `  halfThreshold:     ${(jumpThresh * 0.5).toFixed(4)} (launch trigger)`,
+        'color: #00ff88; font-weight: bold'
+      );
     }
 
     this._isCalibrating = false;
@@ -101,10 +137,13 @@ export class BaselineCalibrator {
     this.samples = [];
     this._isCalibrating = false;
     this._calibrationData = {
-      baselineFootY: 0,
-      torsoHeight: 0,
+      baselineNoseY: 0,
+      baselineShoulderY: 0,
+      baselineNoseZ: 0,
+      baselineShoulderZ: 0,
+      noseShoulderDistY: 0,
+      noseShoulderDist3D: 0,
       shoulderWidth: 0,
-      hipCenterX: 0,
       isCalibrated: false,
     };
   }

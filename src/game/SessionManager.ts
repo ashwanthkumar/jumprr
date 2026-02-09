@@ -1,6 +1,5 @@
 import type { GameState } from './GameState';
 import type { HealthSettings, SessionStats } from '../types';
-import { JumpDirection } from '../types';
 import { REST_SET_DURATION_BASE, REST_COUNTDOWN_BASE, FITNESS_MULTIPLIERS, AGE_GROUP_DEFAULTS } from '../constants';
 
 export class SessionManager {
@@ -13,7 +12,7 @@ export class SessionManager {
   private restDuration = REST_COUNTDOWN_BASE;
   private _isResting = false;
   private _restTimeRemaining = 0;
-  private jumpCounts = { straight: 0, left: 0, right: 0 };
+  private jumpCount = 0;
 
   constructor(gameState: GameState) {
     this.gameState = gameState;
@@ -86,26 +85,22 @@ export class SessionManager {
     this.gameState.emit('restEnd');
   }
 
-  recordJump(direction: JumpDirection): void {
-    this.jumpCounts[direction === JumpDirection.STRAIGHT ? 'straight' : direction === JumpDirection.LEFT ? 'left' : 'right']++;
+  recordJump(): void {
+    this.jumpCount++;
   }
 
   getStats(): SessionStats {
     const state = this.gameState.state;
-    const totalJumps = this.jumpCounts.straight + this.jumpCounts.left + this.jumpCounts.right;
     const minutes = this.elapsed / 60;
 
     return {
       score: state.score,
       distance: Math.floor(state.distance),
-      totalJumps,
-      straightJumps: this.jumpCounts.straight,
-      leftJumps: this.jumpCounts.left,
-      rightJumps: this.jumpCounts.right,
+      totalJumps: this.jumpCount,
       maxCombo: state.maxCombo,
       caloriesBurned: 0, // Will be set by CalorieEstimator
       sessionDuration: this.elapsed,
-      avgJumpsPerMinute: minutes > 0 ? totalJumps / minutes : 0,
+      avgJumpsPerMinute: minutes > 0 ? this.jumpCount / minutes : 0,
     };
   }
 
@@ -114,6 +109,6 @@ export class SessionManager {
     this.playDurationSinceRest = 0;
     this._isResting = false;
     this._restTimeRemaining = 0;
-    this.jumpCounts = { straight: 0, left: 0, right: 0 };
+    this.jumpCount = 0;
   }
 }

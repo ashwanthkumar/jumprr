@@ -9,20 +9,17 @@ export enum GameScreen {
   PAUSED = 'paused',
   REST = 'rest',
   RESULTS = 'results',
+  DIAGNOSTIC = 'diagnostic',
 }
 
 export enum JumpState {
   IDLE = 'idle',
   LAUNCHING = 'launching',
-  AIRBORNE = 'airborne',
-  LANDING = 'landing',
   COOLDOWN = 'cooldown',
 }
 
 export enum JumpDirection {
-  STRAIGHT = 'straight',
-  LEFT = 'left',
-  RIGHT = 'right',
+  UP = 'up',
 }
 
 export enum Lane {
@@ -51,7 +48,6 @@ export enum FitnessLevel {
 }
 
 export interface JumpEvent {
-  direction: JumpDirection;
   timestamp: number;
   verticalVelocity: number;
 }
@@ -76,9 +72,6 @@ export interface SessionStats {
   score: number;
   distance: number;
   totalJumps: number;
-  straightJumps: number;
-  leftJumps: number;
-  rightJumps: number;
   maxCombo: number;
   caloriesBurned: number;
   sessionDuration: number;
@@ -94,7 +87,7 @@ export interface GameStateData {
   maxCombo: number;
   jumpCount: number;
   currentLane: Lane;
-  activeLanes: number; // 1, 2, or 3
+  activeLanes: number; // always 1
   sessionTimeRemaining: number;
   sessionDuration: number;
   isStumbling: boolean;
@@ -114,10 +107,13 @@ export interface PoseData {
 }
 
 export interface CalibrationData {
-  baselineFootY: number;
-  torsoHeight: number;
-  shoulderWidth: number;
-  hipCenterX: number;
+  baselineNoseY: number;        // nose Y at rest (normalized webcam coords)
+  baselineShoulderY: number;    // shoulder midpoint Y at rest
+  baselineNoseZ: number;        // nose Z at rest
+  baselineShoulderZ: number;    // shoulder midpoint Z at rest
+  noseShoulderDistY: number;    // Y-only distance nose-to-shoulder midpoint (for threshold)
+  noseShoulderDist3D: number;   // 3D Euclidean distance (for diagnostics)
+  shoulderWidth: number;        // for reference
   isCalibrated: boolean;
 }
 

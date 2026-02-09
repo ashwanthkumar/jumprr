@@ -41,7 +41,9 @@ export class PoseTracker {
       },
       runningMode: 'VIDEO',
       numPoses: 1,
+      outputSegmentationMasks: false,
     });
+    console.log('[POSE] PoseLandmarker initialized (GPU, lite model)');
 
     this._isReady = true;
   }
@@ -82,14 +84,18 @@ export class PoseTracker {
     }
     this.lastVideoTime = this.videoElement.currentTime;
 
+    const detectStart = performance.now();
     let result: PoseLandmarkerResult;
     try {
       result = this.poseLandmarker.detectForVideo(this.videoElement, now);
-    } catch {
+    } catch (e) {
+      console.warn('[POSE] Detection error:', e);
       return this.lastPoseData;
     }
+    const detectMs = performance.now() - detectStart;
 
     if (!result.landmarks || result.landmarks.length === 0) {
+      console.warn('[POSE] No landmarks detected this frame');
       return this.lastPoseData;
     }
 
@@ -99,6 +105,16 @@ export class PoseTracker {
       z: lm.z,
       visibility: lm.visibility ?? 0,
     }));
+
+    // Log detection latency periodically
+    if (this.frameCount % (POSE_DETECTION_INTERVAL * 10) === 0) {
+      const lowVisCount = landmarks.filter(l => l.visibility < 0.5).length;
+      console.log(
+        `[POSE] Detection took ${detectMs.toFixed(1)}ms | ` +
+        `${landmarks.length} landmarks | ${lowVisCount} low-visibility (<0.5) | ` +
+        `frame #${this.frameCount}`
+      );
+    }
 
     const poseData: PoseData = {
       landmarks,
