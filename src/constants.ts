@@ -7,8 +7,8 @@ export const LANE_POSITIONS = [-LANE_WIDTH, 0, LANE_WIDTH];
 // Track
 export const TRACK_SEGMENT_LENGTH = 20;
 export const TRACK_WIDTH = 9;
-export const TRACK_SEGMENTS_AHEAD = 6;
-export const TRACK_SEGMENTS_BEHIND = 2;
+export const TRACK_SEGMENTS_AHEAD = 8;
+export const TRACK_SEGMENTS_BEHIND = 3;
 
 // Character
 export const CHARACTER_Z = 0;

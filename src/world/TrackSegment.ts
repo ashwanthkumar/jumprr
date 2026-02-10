@@ -4,8 +4,9 @@ import { TRACK_SEGMENT_LENGTH, TRACK_WIDTH } from '../constants';
 const trackMat = new THREE.MeshLambertMaterial({ color: 0x95a5a6 });
 const sideMat = new THREE.MeshLambertMaterial({ color: 0x27ae60 });
 
-const trackGeo = new THREE.BoxGeometry(TRACK_WIDTH, 0.2, TRACK_SEGMENT_LENGTH);
-const sideGeo = new THREE.BoxGeometry(3, 0.15, TRACK_SEGMENT_LENGTH);
+// Slightly oversized in Z to prevent seam gaps between segments from float drift
+const trackGeo = new THREE.BoxGeometry(TRACK_WIDTH, 0.2, TRACK_SEGMENT_LENGTH + 0.1);
+const sideGeo = new THREE.BoxGeometry(3, 0.15, TRACK_SEGMENT_LENGTH + 0.1);
 
 export class TrackSegment {
   readonly mesh: THREE.Group;
