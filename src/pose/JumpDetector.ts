@@ -41,8 +41,8 @@ export class JumpDetector {
     const shoulderMidZ = (lm[LM.LEFT_SHOULDER].z + lm[LM.RIGHT_SHOULDER].z) / 2;
     const zDisp = calibration.baselineShoulderZ - shoulderMidZ;
 
-    // Jump threshold based on nose-to-shoulder Y distance
-    const jumpThreshold = calibration.noseShoulderDistY * JUMP_LAUNCH_THRESHOLD;
+    // Jump threshold based on nose-to-shoulder Y distance (use adapted if available)
+    const jumpThreshold = calibration.noseShoulderDistY * (calibration.adaptedJumpThreshold ?? JUMP_LAUNCH_THRESHOLD);
 
     const primaryDisp = shoulderDisp;
     const noseConfirmed = noseDisp > jumpThreshold * SHOULDER_CONFIRM_RATIO;
@@ -110,8 +110,8 @@ export class JumpDetector {
         break;
 
       case JumpState.COOLDOWN:
-        // Auto-land: return to IDLE after AUTO_LAND_MS
-        if (performance.now() - this.cooldownStartTime > AUTO_LAND_MS) {
+        // Auto-land: return to IDLE after adapted or default land duration
+        if (performance.now() - this.cooldownStartTime > (calibration.adaptedLandMs ?? AUTO_LAND_MS)) {
           this.state = JumpState.IDLE;
           console.log(
             `%c[JUMP] COOLDOWN -> IDLE (${AUTO_LAND_MS}ms auto-land)`,

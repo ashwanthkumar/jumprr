@@ -29,9 +29,9 @@ export const WALL_DEPTH = 0.3;
 export const BASE_SPEED = 12; // units per second
 export const MAX_SPEED = 30;
 export const SPEED_LOG_FACTOR = 3.5;
-export const MIN_OBSTACLE_SPACING = 8;
-export const MAX_OBSTACLE_DENSITY = 0.7; // probability per segment
-export const DENSITY_PLATEAU_DISTANCE = 2000;
+export const MIN_OBSTACLE_SPACING = 6;
+export const MAX_OBSTACLE_DENSITY = 0.85; // probability per segment
+export const DENSITY_PLATEAU_DISTANCE = 1500;
 export const NARROWING_START_DISTANCE = 300;
 export const NARROWING_INTERVAL_MIN = 200;
 export const NARROWING_DURATION_SEGMENTS = 8;
@@ -110,6 +110,21 @@ export const MET_JUMPING = 8.0;
 // Rest
 export const REST_SET_DURATION_BASE = 60; // seconds of play before rest
 export const REST_COUNTDOWN_BASE = 30; // seconds of rest
+
+// Jump Marker
+export const JUMP_MARKER_OFFSET_Z = 3.0;   // units ahead of obstacle (toward player)
+export const JUMP_MARKER_WIDTH = 3.0;       // wider than 2.0-unit barrier for visibility
+export const JUMP_MARKER_DEPTH = 0.6;       // stripe thickness
+export const JUMP_MARKER_COLOR = 0xf1c40f;  // bright yellow
+
+// Cadence
+export const OBSTACLE_SPAWN_Z = -60;
+export const CADENCE_REST_STEP = 10;
+export const CADENCE_REST_MAX = 60;
+
+// Practice calibration
+export const PRACTICE_JUMP_COUNT = 3;
+export const PRACTICE_DETECTION_RATIO = 0.10;
 
 // Visual
 export const FOG_NEAR = 30;

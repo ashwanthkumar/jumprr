@@ -1,6 +1,6 @@
 import { GameScreen } from '../types';
 import type { PoseData } from '../types';
-import { CHARACTER_Z, STUMBLE_DURATION, STUMBLE_SPEED_FACTOR } from '../constants';
+import { CHARACTER_Z, STUMBLE_DURATION, STUMBLE_SPEED_FACTOR, OBSTACLE_SPAWN_Z } from '../constants';
 
 import { Clock } from './Clock';
 import { SceneManager } from './SceneManager';
@@ -9,6 +9,7 @@ import { ScoreSystem } from '../game/ScoreSystem';
 import { CollisionDetector } from '../game/CollisionDetector';
 import { DifficultyManager } from '../game/DifficultyManager';
 import { SessionManager } from '../game/SessionManager';
+import { ObstacleCadence } from '../game/ObstacleCadence';
 import { PlayerCharacter } from '../character/PlayerCharacter';
 import { CharacterAnimator } from '../character/CharacterAnimator';
 import { LaneController } from '../character/LaneController';
@@ -26,7 +27,7 @@ import { RecommendationEngine } from '../health/RecommendationEngine';
 import { UIManager } from '../ui/UIManager';
 import { createWelcomeScreen } from '../ui/screens/WelcomeScreen';
 import { createSetupScreen } from '../ui/screens/SetupScreen';
-import { createCalibrationScreen, resetCalibrationScreen, startCalibrationCountdown, updateCalibrationProgress } from '../ui/screens/CalibrationScreen';
+import { createCalibrationScreen, resetCalibrationScreen, startCalibrationCountdown, updateCalibrationProgress, showPracticePhase, updatePracticeCount } from '../ui/screens/CalibrationScreen';
 import { createCountdownScreen, runCountdown } from '../ui/screens/CountdownScreen';
 import { createHUDScreen, updateHUD } from '../ui/screens/HUDScreen';
 import { createPauseScreen } from '../ui/screens/PauseScreen';
@@ -42,6 +43,7 @@ export class GameEngine {
   private collisionDetector: CollisionDetector;
   private difficultyManager: DifficultyManager;
   private sessionManager: SessionManager;
+  private cadence: ObstacleCadence;
   private playerCharacter: PlayerCharacter;
   private characterAnimator: CharacterAnimator;
   private laneController: LaneController;
@@ -65,6 +67,7 @@ export class GameEngine {
   private diagJumpCount = 0;
   private lastRestWallTime = 0;
   private resumingFromRest = false;
+  private practicePhaseShown = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.clock = new Clock();
@@ -74,6 +77,7 @@ export class GameEngine {
     this.collisionDetector = new CollisionDetector();
     this.difficultyManager = new DifficultyManager();
     this.sessionManager = new SessionManager(this.gameState);
+    this.cadence = new ObstacleCadence();
     this.laneController = new LaneController();
     this.jumpAnimator = new JumpAnimator();
     this.playerCharacter = new PlayerCharacter();
@@ -282,6 +286,7 @@ export class GameEngine {
     // Show calibration screen with instructions + "I'm Ready" button
     const calScreen = this.uiManager.getScreen(GameScreen.CALIBRATION)!;
     resetCalibrationScreen(calScreen);
+    this.practicePhaseShown = false;
     this.uiManager.showScreen(GameScreen.CALIBRATION);
     this.gameState.setScreen(GameScreen.CALIBRATION);
     // Calibration sampling starts when user clicks "I'm Ready"
@@ -315,6 +320,7 @@ export class GameEngine {
     this.scoreSystem.reset();
     this.difficultyManager.reset();
     this.sessionManager.reset();
+    this.cadence.fullReset();
     this.laneController.reset();
     this.jumpAnimator.reset();
     this.characterAnimator.reset();
@@ -352,7 +358,7 @@ export class GameEngine {
   }
 
   private showResults(): void {
-    const stats = this.sessionManager.getStats();
+    const stats = this.sessionManager.getStats(this.cadence.totalSpawned);
     const settings = this.healthProfile.settings;
 
     // Calculate calories
@@ -382,16 +388,32 @@ export class GameEngine {
     // Always render the scene
     this.sceneManager.render();
 
-    // Calibration: keep detecting pose to feed samples
+    // Calibration: keep detecting pose to feed samples or practice jumps
     if (screen === GameScreen.CALIBRATION) {
       const pose = this.poseTracker.detect();
       if (pose) {
         this.skeletonOverlay.draw(pose);
+
         if (this.calibrator.isCalibrating) {
           const done = this.calibrator.addSample(pose);
           const calScreen = this.uiManager.getScreen(GameScreen.CALIBRATION)!;
           updateCalibrationProgress(calScreen, this.calibrator.progress);
           if (done) {
+            // Standing calibration done — transition to practice phase
+            this.skeletonOverlay.setCalibration(this.calibrator.calibrationData);
+            showPracticePhase(calScreen);
+            this.practicePhaseShown = true;
+          }
+        } else if (this.calibrator.isPracticing) {
+          const calScreen = this.uiManager.getScreen(GameScreen.CALIBRATION)!;
+          if (!this.practicePhaseShown) {
+            showPracticePhase(calScreen);
+            this.practicePhaseShown = true;
+          }
+          updatePracticeCount(calScreen, this.calibrator.practiceJumpCount);
+          const done = this.calibrator.addPracticeSample(pose);
+          if (done) {
+            updatePracticeCount(calScreen, this.calibrator.practiceJumpCount);
             this.skeletonOverlay.setCalibration(this.calibrator.calibrationData);
             this.gameState.emit('calibrationComplete');
 
@@ -466,21 +488,10 @@ export class GameEngine {
 
     if (screen !== GameScreen.PLAYING) return;
 
-    // Session management
-    const sessionResult = this.sessionManager.update(dt);
-    if (sessionResult === 'rest') {
-      this.clock.pause();
-      this.lastRestWallTime = performance.now();
-      this.uiManager.showScreen(GameScreen.REST);
-      this.gameState.setScreen(GameScreen.REST);
-      return;
-    }
-    if (sessionResult === 'ended') {
-      this.endSession();
-      return;
-    }
+    // Session management (tracks elapsed time, no auto-end)
+    this.sessionManager.update(dt);
 
-    // Difficulty
+    // Difficulty (constant speed)
     const speed = this.difficultyManager.update(this.distance);
     const effectiveSpeed = this.stumbleTimer > 0 ? speed * STUMBLE_SPEED_FACTOR : speed;
     this.gameState.setSpeed(effectiveSpeed);
@@ -503,6 +514,38 @@ export class GameEngine {
     this.levelGenerator.update(scrollAmount, this.distance);
     this.environment.scrollTrees(scrollAmount);
     this.environment.update(this.distance);
+
+    // Obstacle cadence
+    const cadenceResult = this.cadence.update(dt);
+    if (cadenceResult === 'spawn') {
+      this.levelGenerator.spawnAhead(OBSTACLE_SPAWN_Z);
+      this.gameState.incrementObstaclesSpawned();
+    } else if (cadenceResult === 'cycle_complete') {
+      // Spawn the last obstacle of the cycle
+      this.levelGenerator.spawnAhead(OBSTACLE_SPAWN_Z);
+      this.gameState.incrementObstaclesSpawned();
+
+      // Trigger rest
+      const restDuration = this.cadence.getRestDuration();
+      this.cadence.reset();
+      this.sessionManager.startRest(restDuration);
+      this.clock.pause();
+      this.lastRestWallTime = performance.now();
+      this.uiManager.showScreen(GameScreen.REST);
+      this.gameState.setScreen(GameScreen.REST);
+      return;
+    }
+
+    // Calculate time to next obstacle (from nearest obstacle ahead)
+    const obstacles = this.levelGenerator.getObstacles();
+    let minAheadZ = Infinity;
+    for (const obs of obstacles) {
+      if (obs.position.z < 0 && Math.abs(obs.position.z) < minAheadZ) {
+        minAheadZ = Math.abs(obs.position.z);
+      }
+    }
+    const timeToNext = minAheadZ < Infinity ? minAheadZ / effectiveSpeed : Infinity;
+    this.gameState.setTimeToNextObstacle(timeToNext);
 
     // Pose detection + jump detection
     const pose = this.poseTracker.detect();
@@ -555,6 +598,8 @@ export class GameEngine {
     this.stumbleTimer = STUMBLE_DURATION;
     this.gameState.setStumbling(true);
     this.scoreSystem.onCollision();
+    this.sessionManager.recordCollision();
+    this.gameState.incrementCollisionCount();
     this.uiManager.shakeScreen();
   }
 

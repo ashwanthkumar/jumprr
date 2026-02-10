@@ -17,6 +17,9 @@ export class GameState {
     sessionDuration: 0,
     isStumbling: false,
     isPaused: false,
+    timeToNextObstacle: Infinity,
+    obstaclesSpawned: 0,
+    collisionCount: 0,
   };
 
   get state(): Readonly<GameStateData> {
@@ -96,6 +99,18 @@ export class GameState {
     this.data.isPaused = paused;
   }
 
+  setTimeToNextObstacle(t: number): void {
+    this.data.timeToNextObstacle = t;
+  }
+
+  incrementObstaclesSpawned(): void {
+    this.data.obstaclesSpawned++;
+  }
+
+  incrementCollisionCount(): void {
+    this.data.collisionCount++;
+  }
+
   reset(): void {
     this.data.score = 0;
     this.data.distance = 0;
@@ -107,5 +122,8 @@ export class GameState {
     this.data.activeLanes = 3;
     this.data.isStumbling = false;
     this.data.isPaused = false;
+    this.data.timeToNextObstacle = Infinity;
+    this.data.obstaclesSpawned = 0;
+    this.data.collisionCount = 0;
   }
 }

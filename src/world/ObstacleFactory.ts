@@ -4,6 +4,7 @@ import {
   BARRIER_HEIGHT, BARRIER_WIDTH, BARRIER_DEPTH,
   WALL_HEIGHT, WALL_WIDTH, WALL_DEPTH,
   LANE_WIDTH,
+  JUMP_MARKER_OFFSET_Z, JUMP_MARKER_WIDTH, JUMP_MARKER_DEPTH, JUMP_MARKER_COLOR,
 } from '../constants';
 import { ObjectPool } from './ObjectPool';
 
@@ -22,6 +23,9 @@ const barrierPoleMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
 
 const wallMat = new THREE.MeshLambertMaterial({ color: 0x636e72 });
 const wallGeo = new THREE.BoxGeometry(WALL_WIDTH, WALL_HEIGHT, WALL_DEPTH);
+
+const markerGeo = new THREE.BoxGeometry(JUMP_MARKER_WIDTH, 0.02, JUMP_MARKER_DEPTH);
+const markerMat = new THREE.MeshLambertMaterial({ color: JUMP_MARKER_COLOR });
 
 function createBarrier(): Obstacle {
   const group = new THREE.Group() as Obstacle;
@@ -44,6 +48,11 @@ function createBarrier(): Obstacle {
   rightPole.castShadow = true;
   group.add(rightPole);
 
+  // Jump marker on ground ahead of barrier
+  const marker = new THREE.Mesh(markerGeo, markerMat);
+  marker.position.set(0, 0.01, JUMP_MARKER_OFFSET_Z);
+  group.add(marker);
+
   return group;
 }
 
@@ -65,6 +74,11 @@ function createWall(): Obstacle {
     stripe.position.set(0, 0.5 + i * 1.0, 0);
     group.add(stripe);
   }
+
+  // Jump marker on ground ahead of wall
+  const marker = new THREE.Mesh(markerGeo, markerMat);
+  marker.position.set(0, 0.01, JUMP_MARKER_OFFSET_Z);
+  group.add(marker);
 
   return group;
 }

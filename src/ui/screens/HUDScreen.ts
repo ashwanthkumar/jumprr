@@ -12,11 +12,12 @@ export function createHUDScreen(): HTMLElement {
         <div class="hud-combo" id="hud-combo">Combo x0</div>
       </div>
       <div class="hud-info">
-        <div class="hud-timer" id="hud-timer">5:00</div>
+        <div class="hud-timer" id="hud-timer">0:00</div>
         <div class="hud-jumps" id="hud-jumps">Jumps: 0</div>
         <div class="hud-distance" id="hud-distance">0m</div>
       </div>
     </div>
+    <div class="hud-jump-countdown" id="hud-jump-countdown"></div>
   `;
 
   return screen;
@@ -28,6 +29,7 @@ export function updateHUD(screen: HTMLElement, state: GameStateData): void {
   const timerEl = screen.querySelector('#hud-timer') as HTMLElement;
   const jumpsEl = screen.querySelector('#hud-jumps') as HTMLElement;
   const distEl = screen.querySelector('#hud-distance') as HTMLElement;
+  const countdownEl = screen.querySelector('#hud-jump-countdown') as HTMLElement;
 
   scoreEl.textContent = String(state.score);
 
@@ -38,16 +40,34 @@ export function updateHUD(screen: HTMLElement, state: GameStateData): void {
     comboEl.classList.remove('visible');
   }
 
-  const minutes = Math.floor(state.sessionTimeRemaining / 60);
-  const seconds = Math.floor(state.sessionTimeRemaining % 60);
+  // Elapsed time counting up
+  const elapsed = state.sessionTimeRemaining; // now stores elapsed time
+  const minutes = Math.floor(elapsed / 60);
+  const seconds = Math.floor(elapsed % 60);
   timerEl.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-
-  if (state.sessionTimeRemaining < 30) {
-    timerEl.classList.add('warning');
-  } else {
-    timerEl.classList.remove('warning');
-  }
+  timerEl.classList.remove('warning');
 
   jumpsEl.textContent = `Jumps: ${state.jumpCount}`;
   distEl.textContent = `${Math.floor(state.distance)}m`;
+
+  // Jump countdown
+  const t = state.timeToNextObstacle;
+  if (t < Infinity && t > 0) {
+    countdownEl.style.display = '';
+    if (t <= 1) {
+      countdownEl.textContent = 'JUMP!';
+      countdownEl.classList.remove('warning');
+      countdownEl.classList.add('urgent');
+    } else if (t <= 3) {
+      countdownEl.textContent = `JUMP IN ${t.toFixed(1)}s`;
+      countdownEl.classList.add('warning');
+      countdownEl.classList.remove('urgent');
+    } else {
+      countdownEl.textContent = `JUMP IN ${t.toFixed(1)}s`;
+      countdownEl.classList.remove('warning', 'urgent');
+    }
+  } else {
+    countdownEl.style.display = 'none';
+    countdownEl.classList.remove('warning', 'urgent');
+  }
 }

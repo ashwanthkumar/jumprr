@@ -6,9 +6,6 @@ import {
   TRACK_SEGMENT_LENGTH,
   TRACK_SEGMENTS_AHEAD,
   TRACK_SEGMENTS_BEHIND,
-  MIN_OBSTACLE_SPACING,
-  MAX_OBSTACLE_DENSITY,
-  DENSITY_PLATEAU_DISTANCE,
 } from '../constants';
 
 export class LevelGenerator {
@@ -17,7 +14,6 @@ export class LevelGenerator {
   private obstacles: Obstacle[] = [];
   private obstacleFactory: ObstacleFactory;
   private furthestZ = 0;
-  private lastObstacleZ = 0;
   private totalDistance = 0;
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -67,39 +63,13 @@ export class LevelGenerator {
         // Move to front
         this.furthestZ -= TRACK_SEGMENT_LENGTH;
         seg.setPosition(this.furthestZ);
-
-        // Maybe spawn obstacles on this new segment
-        this.maybeSpawnObstacles(seg.zPosition);
       }
     }
   }
 
-  private maybeSpawnObstacles(segZ: number): void {
-    if (segZ > this.lastObstacleZ - MIN_OBSTACLE_SPACING) return;
-
-    const density = this.getObstacleDensity();
-    if (Math.random() > density) return;
-
-    // Decide obstacle pattern
-    const pattern = this.generatePattern();
-
-    for (const { type, lane } of pattern) {
-      const z = segZ + (Math.random() * 0.5 - 0.25) * TRACK_SEGMENT_LENGTH * 0.3;
-      const obs = this.obstacleFactory.spawn(type, lane, z);
-      this.obstacles.push(obs);
-    }
-
-    this.lastObstacleZ = segZ;
-  }
-
-  private generatePattern(): Array<{ type: ObstacleType; lane: Lane }> {
-    // Single lane: always spawn a barrier in center (must jump over it)
-    return [{ type: ObstacleType.BARRIER, lane: Lane.CENTER }];
-  }
-
-  private getObstacleDensity(): number {
-    const t = Math.min(this.totalDistance / DENSITY_PLATEAU_DISTANCE, 1);
-    return t * MAX_OBSTACLE_DENSITY;
+  spawnAhead(z: number): void {
+    const obs = this.obstacleFactory.spawn(ObstacleType.BARRIER, Lane.CENTER, z);
+    this.obstacles.push(obs);
   }
 
   getObstacles(): Obstacle[] {
@@ -118,7 +88,6 @@ export class LevelGenerator {
       this.segments[i].setPosition(-i * TRACK_SEGMENT_LENGTH);
     }
     this.furthestZ = -(this.segments.length - 1) * TRACK_SEGMENT_LENGTH;
-    this.lastObstacleZ = 0;
     this.totalDistance = 0;
   }
 }

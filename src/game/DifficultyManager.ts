@@ -1,5 +1,5 @@
 import {
-  BASE_SPEED, MAX_SPEED, SPEED_LOG_FACTOR,
+  BASE_SPEED,
   NARROWING_INTERVAL_MIN,
 } from '../constants';
 
@@ -15,10 +15,8 @@ export class DifficultyManager {
     this.speedFactor = factor;
   }
 
-  update(distance: number): number {
-    // Logarithmic speed curve
-    const logSpeed = BASE_SPEED + SPEED_LOG_FACTOR * Math.log(1 + distance / 100);
-    this._currentSpeed = Math.min(logSpeed * this.speedFactor, MAX_SPEED * this.speedFactor);
+  update(_distance: number): number {
+    this._currentSpeed = BASE_SPEED * this.speedFactor;
     return this._currentSpeed;
   }
 

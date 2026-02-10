@@ -76,6 +76,8 @@ export interface SessionStats {
   caloriesBurned: number;
   sessionDuration: number;
   avgJumpsPerMinute: number;
+  obstaclesCleared: number;
+  obstaclesMissed: number;
 }
 
 export interface GameStateData {
@@ -92,6 +94,9 @@ export interface GameStateData {
   sessionDuration: number;
   isStumbling: boolean;
   isPaused: boolean;
+  timeToNextObstacle: number;
+  obstaclesSpawned: number;
+  collisionCount: number;
 }
 
 export interface Landmark {
@@ -115,6 +120,8 @@ export interface CalibrationData {
   noseShoulderDist3D: number;   // 3D Euclidean distance (for diagnostics)
   shoulderWidth: number;        // for reference
   isCalibrated: boolean;
+  adaptedJumpThreshold?: number;  // derived from practice jumps
+  adaptedLandMs?: number;         // derived from practice jump duration
 }
 
 export interface ObstacleConfig {

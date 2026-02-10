@@ -65,6 +65,14 @@ export function updateResults(
       <div class="result-value">${minutes}:${seconds.toString().padStart(2, '0')}</div>
       <div class="result-label">Duration</div>
     </div>
+    <div class="result-card">
+      <div class="result-value">${stats.obstaclesCleared}</div>
+      <div class="result-label">Cleared</div>
+    </div>
+    <div class="result-card">
+      <div class="result-value">${stats.obstaclesMissed}</div>
+      <div class="result-label">Missed</div>
+    </div>
   `;
 
   recsEl.innerHTML = recommendations.map(r => `
