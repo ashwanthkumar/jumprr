@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CAMERA_POSITION, CAMERA_LOOK_AT, FOG_NEAR, FOG_FAR } from '../constants';
+import { CAMERA_POSITION, CAMERA_LOOK_AT } from '../constants';
 
 export class SceneManager {
   readonly scene: THREE.Scene;
@@ -11,7 +11,6 @@ export class SceneManager {
   constructor(canvas: HTMLCanvasElement) {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x87ceeb);
-    this.scene.fog = new THREE.Fog(0x87ceeb, FOG_NEAR, FOG_FAR);
 
     this.camera = new THREE.PerspectiveCamera(
       60,
@@ -57,8 +56,7 @@ export class SceneManager {
     this.renderer.render(this.scene, this.camera);
   }
 
-  setFogColor(color: number): void {
-    (this.scene.fog as THREE.Fog).color.setHex(color);
+  setBackgroundColor(color: number): void {
     (this.scene.background as THREE.Color).setHex(color);
   }
 

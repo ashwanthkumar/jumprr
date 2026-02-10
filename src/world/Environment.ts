@@ -70,9 +70,6 @@ export class Environment {
     if (newIndex !== this.currentThemeIndex) {
       this.currentThemeIndex = newIndex;
       const theme = THEMES[this.currentThemeIndex];
-      if (this.scene.fog instanceof THREE.Fog) {
-        this.scene.fog.color.setHex(theme.fog);
-      }
       if (this.scene.background instanceof THREE.Color) {
         this.scene.background.setHex(theme.sky);
       }

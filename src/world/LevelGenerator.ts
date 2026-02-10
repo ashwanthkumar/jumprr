@@ -13,7 +13,6 @@ export class LevelGenerator {
   private segments: TrackSegment[] = [];
   private obstacles: Obstacle[] = [];
   private obstacleFactory: ObstacleFactory;
-  private furthestZ = 0;
   private totalDistance = 0;
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -30,7 +29,7 @@ export class LevelGenerator {
       this.scene.add(segment.mesh);
       this.segments.push(segment);
     }
-    this.furthestZ = -(totalSegments - 1) * TRACK_SEGMENT_LENGTH;
+    // furthestZ computed dynamically from segments
   }
 
   setActiveLanes(_count: number): void {
@@ -58,11 +57,15 @@ export class LevelGenerator {
     }
 
     // Recycle segments that moved behind camera
+    const recycleThreshold = TRACK_SEGMENTS_BEHIND * TRACK_SEGMENT_LENGTH;
     for (const seg of this.segments) {
-      if (seg.zPosition > TRACK_SEGMENTS_BEHIND * TRACK_SEGMENT_LENGTH) {
-        // Move to front
-        this.furthestZ -= TRACK_SEGMENT_LENGTH;
-        seg.setPosition(this.furthestZ);
+      if (seg.zPosition > recycleThreshold) {
+        // Find the actual furthest-ahead segment Z
+        let minZ = Infinity;
+        for (const s of this.segments) {
+          if (s.zPosition < minZ) minZ = s.zPosition;
+        }
+        seg.setPosition(minZ - TRACK_SEGMENT_LENGTH);
       }
     }
   }
@@ -87,7 +90,6 @@ export class LevelGenerator {
     for (let i = 0; i < this.segments.length; i++) {
       this.segments[i].setPosition(-i * TRACK_SEGMENT_LENGTH);
     }
-    this.furthestZ = -(this.segments.length - 1) * TRACK_SEGMENT_LENGTH;
     this.totalDistance = 0;
   }
 }
